@@ -1,0 +1,86 @@
+  AWSTemplateFormatVersion: "2010-09-09"
+  
+  Description: Setup Redirect Website Bucket and Distro. https://github.com/oramco/cfn-redirect-s3-cdn
+  
+  Metadata:
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+        - Label:
+            default: SSL and Domain
+          Parameters:            
+            - DomainName
+            - CertificateArn
+            - RedirectTargetDomainName
+      ParameterLabels:        
+        CertificateArn:
+          default: 'AWS ACM Certificate Arn'
+        DomainName:
+          default: 'Domain Name'
+
+  Parameters:
+    CertificateArn:
+      Type: String
+    
+    DomainName:
+      Type: String
+
+    RedirectTargetDomainName:
+      Type: String
+      Description: The domain name to redirect all requests to. This should not contain the protocol (http:// or https://)
+
+  Resources: 
+
+    WebsiteBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        # Encrypt everything. 
+        BucketEncryption:
+          ServerSideEncryptionConfiguration:
+            - ServerSideEncryptionByDefault:
+                SSEAlgorithm: AES256
+
+        # Kill any incomplete multi-part uploads
+        LifecycleConfiguration:
+          Rules:                      
+            - Id: CloudTrailTransitions
+              Status: Enabled
+              AbortIncompleteMultipartUpload:
+                DaysAfterInitiation: 2
+       
+        WebsiteConfiguration:
+          RedirectAllRequestsTo: 
+            HostName: !Ref RedirectTargetDomainName   
+
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Origins:
+            - DomainName: !Select [2, !Split ["/", !GetAtt WebsiteBucket.WebsiteURL]]
+              Id: S3Origin
+              CustomOriginConfig:
+                HTTPPort: 80
+                HTTPSPort: 443
+                OriginProtocolPolicy: http-only
+          Enabled: true
+          HttpVersion: http2
+          DefaultRootObject: index.html
+          Aliases:
+            - !Sub ${DomainName}
+            - !Sub www.${DomainName}
+          DefaultCacheBehavior:
+            AllowedMethods:             
+              - GET
+              - HEAD
+            Compress: true
+            TargetOriginId: S3Origin
+            ForwardedValues:
+              QueryString: true
+              Cookies:
+                Forward: none            
+            ViewerProtocolPolicy: redirect-to-https
+          PriceClass: PriceClass_All          
+          ViewerCertificate:
+            AcmCertificateArn: !Ref CertificateArn
+            SslSupportMethod: sni-only
+    
