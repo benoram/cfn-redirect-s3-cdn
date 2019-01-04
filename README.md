@@ -1,6 +1,6 @@
-# cfn-website-s3-cdn
+# cfn-redirect-s3-cdn
 
-Create an S3 bucket to host a static website behind a CloudFront distribution
+Create an S3 bucket to host a redirect website behind a CloudFront distribution
 
 
 ## Notes

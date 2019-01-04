@@ -8,21 +8,22 @@
         - Label:
             default: SSL and Domain
           Parameters:            
-            - DomainName
+            - Domains
             - CertificateArn
             - RedirectTargetDomainName
       ParameterLabels:        
         CertificateArn:
           default: 'AWS ACM Certificate Arn'
-        DomainName:
-          default: 'Domain Name'
+        Domains:
+          default: 'Domains'
 
   Parameters:
     CertificateArn:
       Type: String
     
-    DomainName:
+    Domains:
       Type: String
+      Description: The domains to accept traffic for. Comma delimited list of one or more domains.
 
     RedirectTargetDomainName:
       Type: String
@@ -42,7 +43,7 @@
         # Kill any incomplete multi-part uploads
         LifecycleConfiguration:
           Rules:                      
-            - Id: CloudTrailTransitions
+            - Id: ObjectTransitions
               Status: Enabled
               AbortIncompleteMultipartUpload:
                 DaysAfterInitiation: 2
@@ -50,6 +51,7 @@
         WebsiteConfiguration:
           RedirectAllRequestsTo: 
             HostName: !Ref RedirectTargetDomainName   
+            Protocol: https
 
     CloudFrontDistribution:
       Type: AWS::CloudFront::Distribution
@@ -64,10 +66,7 @@
                 OriginProtocolPolicy: http-only
           Enabled: true
           HttpVersion: http2
-          DefaultRootObject: index.html
-          Aliases:
-            - !Sub ${DomainName}
-            - !Sub www.${DomainName}
+          Aliases: !Split [",", !Ref Domains]
           DefaultCacheBehavior:
             AllowedMethods:             
               - GET
@@ -78,7 +77,7 @@
               QueryString: true
               Cookies:
                 Forward: none            
-            ViewerProtocolPolicy: redirect-to-https
+            ViewerProtocolPolicy: allow-all
           PriceClass: PriceClass_All          
           ViewerCertificate:
             AcmCertificateArn: !Ref CertificateArn
